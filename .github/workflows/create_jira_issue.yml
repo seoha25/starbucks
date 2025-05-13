@@ -3,7 +3,7 @@ name: Create Jira issue
 on:
   issues:
     types: [opened]
-    
+
 jobs:
   create-issue:
     name: Create Jira issue
@@ -11,18 +11,46 @@ jobs:
     steps:
       - name: Login to Jira
         uses: atlassian/gajira-login@v3
-        env: 
+        env:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
           JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
-    
+
       - name: Create Issue in Jira
+        id: create
         uses: atlassian/gajira-create@v3
         with:
-          project: PROJECT_KEY  # ← 여기에 실제 프로젝트 키!
+          project: HYUZ
           issuetype: Story
           summary: '${{ github.event.issue.title }}'
-          description: '${{ github.event.issue.html_url }}'
+          description: 'Automatically created from GitHub issue.'
 
+      - name: Checkout develop code
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Create branch with Ticket number
+        run: |
+          ISSUE_NUMBER="${{ steps.create.outputs.issue }}"
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          BRANCH_NAME="${ISSUE_NUMBER}-$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g')"
+          git checkout -b "$BRANCH_NAME"
+          git push origin "$BRANCH_NAME"
+
+      - name: Update issue title
+        uses: actions-cool/issues-helper@v3
+        with:
+          actions: 'update-issue'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: "${{ steps.create.outputs.issue }} ${{ github.event.issue.title }}"
+
+      - name: Add comment with Jira issue link
+        uses: actions-cool/issues-helper@v3
+        with:
+          actions: 'create-comment'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.issue.number }}
+          body: 'Jira Issue Created: [${{ steps.create.outputs.issue }}](${{ secrets.JIRA_BASE_URL }}/browse/${{ steps.create.outputs.issue }})'
 
 
