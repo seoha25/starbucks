@@ -20,7 +20,7 @@ jobs:
         id: create
         uses: atlassian/gajira-create@v3
         with:
-          project: HYUZ
+          project: YZMA
           issuetype: Story
           summary: '${{ github.event.issue.title }}'
           description: 'Automatically created from GitHub issue.'
