@@ -1,0 +1,44 @@
+name: Close GitHub and Jira issues on develop merge
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  issues: write
+
+jobs:
+  close-issues:
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'develop'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract GitHub linked issues
+        id: extract
+        uses: peter-evans/linked-issues@v1
+
+      - name: Close GitHub issues
+        uses: actions-cool/issues-helper@v3
+        with:
+          actions: 'close-issue'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ steps.extract.outputs.issues }}
+
+      - name: Extract Jira issue key from PR body
+        id: extract-jira
+        run: |
+          echo "JIRA_KEY=$(echo '${{ github.event.pull_request.body }}' | grep -oE '[A-Z]+-[0-9]+')" >> $GITHUB_OUTPUT
+
+      - name: Transition Jira issue to Done
+        if: steps.extract-jira.outputs.JIRA_KEY != ''
+        uses: atlassian/gajira-login@v3
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+
+      - name: Move Jira issue to Done
+        if: steps.extract-jira.outputs.JIRA_KEY != ''
+        uses: atlassian/gajira-transition@v3
+        with:
+          issue: ${{ steps.extract-jira.outputs.JIRA_KEY }}
+          transition: Done
